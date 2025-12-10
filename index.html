@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Budget App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-links">
+            <a href="#" class="nav-link active" data-section="dashboard">Dashboard</a>
+            <a href="#" class="nav-link" data-section="budget">Budget</a>
+            <a href="#" class="nav-link" data-section="transactions">Transactions</a>
+            <a href="#" class="nav-link" data-section="categories">Categories</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section">
+            <div class="section-header">
+                <h2>Dashboard</h2>
+                <div class="month-selector">
+                    <button id="prev-month-dashboard">&lt; Prev</button>
+                    <span id="current-month-dashboard"></span>
+                    <button id="next-month-dashboard">Next &gt;</button>
+                </div>
+            </div>
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>Total Income</h3>
+                    <p id="total-income-dashboard">$0.00</p>
+                </div>
+                <div class="card">
+                    <h3>Total Expenses</h3>
+                    <p id="total-expenses-dashboard">$0.00</p>
+                </div>
+                <div class="card">
+                    <h3>Net Balance</h3>
+                    <p id="net-balance-dashboard">$0.00</p>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Category Breakdown</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Actual Spent</th>
+                            <th>Budgeted</th>
+                            <th>Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody id="category-breakdown-body">
+                        <!-- Rows will be injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="card">
+                <h3>Data Management</h3>
+                <p>Save your data to a file for backup or to transfer to another browser.</p>
+                <div class="data-management-actions">
+                    <button id="export-data-btn" class="btn">Export All Data</button>
+                    <button id="import-data-btn" class="btn">Import Data</button>
+                    <input type="file" id="import-data-input" class="hidden" accept=".json">
+                </div>
+            </div>
+        </section>
+
+        <!-- Budget Section -->
+        <section id="budget" class="section hidden">
+            <div class="section-header">
+                <h2>Monthly Budget</h2>
+                 <div class="month-selector">
+                    <button id="prev-month-budget">&lt; Prev</button>
+                    <span id="current-month-budget"></span>
+                    <button id="next-month-budget">Next &gt;</button>
+                </div>
+            </div>
+            <div class="card">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Budgeted</th>
+                            <th>Actual</th>
+                            <th>Difference</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-table-body">
+                        <!-- Rows will be injected by JS -->
+                    </tbody>
+                </table>
+                <button id="save-budget-btn" class="btn btn-primary">Save Budget</button>
+            </div>
+        </section>
+
+        <!-- Transactions Section -->
+        <section id="transactions" class="section hidden">
+            <div class="section-header">
+                <h2>Transactions</h2>
+                 <div class="month-selector">
+                    <button id="prev-month-transactions">&lt; Prev</button>
+                    <span id="current-month-transactions"></span>
+                    <button id="next-month-transactions">Next &gt;</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="transaction-actions">
+                    <button id="add-transaction-btn" class="btn btn-primary">Add Transaction</button>
+                    <button id="import-csv-btn" class="btn">Import CSV</button>
+                </div>
+                <input type="text" id="transaction-filter" placeholder="Filter by description..." class="form-input">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Source</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-table-body">
+                        <!-- Rows will be injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Categories Section -->
+        <section id="categories" class="section hidden">
+            <div class="section-header">
+                <h2>Categories</h2>
+            </div>
+            <div class="card">
+                <h3>Manage Categories</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Category Name</th>
+                            <th>Active?</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categories-table-body">
+                        <!-- Rows will be injected by JS -->
+                    </tbody>
+                </table>
+                <h3>Add New Category</h3>
+                <div class="add-category-form">
+                    <input type="text" id="new-category-name" placeholder="New category name" class="form-input">
+                    <button id="add-category-btn" class="btn btn-primary">Add Category</button>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Modals -->
+    <div id="transaction-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3 id="modal-title">Add Transaction</h3>
+            <form id="transaction-form">
+                <input type="hidden" id="transaction-id">
+                <div class="form-group">
+                    <label for="transaction-date">Date</label>
+                    <input type="date" id="transaction-date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-description">Description</label>
+                    <input type="text" id="transaction-description" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-amount">Amount</label>
+                    <input type="number" id="transaction-amount" class="form-input" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-type">Type</label>
+                    <select id="transaction-type" class="form-input" required>
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-category">Category</label>
+                    <select id="transaction-category" class="form-input" required>
+                        <!-- Options will be injected by JS -->
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Transaction</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="csv-import-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>Import CSV</h3>
+            <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+            <button id="trigger-csv-input" class="btn">Choose CSV File</button>
+            <div id="csv-preview-area" class="hidden">
+                <h4>CSV Preview</h4>
+                <table class="table">
+                    <thead id="csv-preview-head"></thead>
+                    <tbody id="csv-preview-body"></tbody>
+                </table>
+                <h4>Map Columns</h4>
+                <div class="csv-mapping">
+                     <div class="form-group">
+                        <label for="csv-date-col">Date Column</label>
+                        <select id="csv-date-col" class="form-input"></select>
+                    </div>
+                     <div class="form-group">
+                        <label for="csv-description-col">Description Column</label>
+                        <select id="csv-description-col" class="form-input"></select>
+                    </div>
+                     <div class="form-group">
+                        <label for="csv-amount-col">Amount Column</label>
+                        <select id="csv-amount-col" class="form-input"></select>
+                    </div>
+                </div>
+                 <h4>Import Options</h4>
+                <div class="form-group">
+                    <label for="csv-default-type">Default Type for Imported Rows</label>
+                    <select id="csv-default-type" class="form-input">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                    </select>
+                </div>
+                 <div class="form-group">
+                    <label for="csv-default-category">Default Category for Imported Rows</label>
+                    <select id="csv-default-category" class="form-input"></select>
+                </div>
+                <button id="import-csv-confirm-btn" class="btn btn-primary">Import Transactions</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="app.js" defer></script>
+</body>
+</html>
