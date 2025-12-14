@@ -459,20 +459,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateCol = parseInt(document.getElementById('csv-date-col').value, 10);
             const descCol = parseInt(document.getElementById('csv-description-col').value, 10);
             const amountCol = parseInt(document.getElementById('csv-amount-col').value, 10);
-            const defaultType = document.getElementById('csv-default-type').value;
-            const defaultCategory = document.getElementById('csv-default-category').value;
             
             const newTransactions = data.map(row => {
                 const amount = parseFloat(row[amountCol].replace(/[^0-9.-]+/g,""));
                 if (isNaN(amount)) return null;
+
+                // Determine type and category based on amount sign
+                // Negative = expense, Positive = income
+                const isExpense = amount < 0;
+                const transactionType = isExpense ? 'expense' : 'income';
+                
+                // Find appropriate default category
+                // Expense defaults to Housing (cat-1), Income defaults to Miscellaneous (cat-9)
+                const defaultCategoryId = isExpense ? 'cat-1' : 'cat-9';
 
                 return {
                     id: generateId(),
                     date: new Date(row[dateCol]).toISOString().slice(0, 10),
                     description: row[descCol],
                     amount: Math.abs(amount),
-                    type: defaultType,
-                    categoryId: defaultCategory,
+                    type: transactionType,
+                    categoryId: defaultCategoryId,
                     source: 'csv'
                 };
             }).filter(Boolean); // Filter out any nulls from failed parsing
