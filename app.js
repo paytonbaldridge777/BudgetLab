@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Trim whitespace
         amountStr = amountStr.trim();
         
-        // Match currency pattern: optional minus, digits with optional commas, optional decimal with 2 digits
+        // Match currency pattern: optional minus, digits with proper comma placement every 3 digits, optional decimal with up to 2 digits
         // Examples: -123.45, 1234.56, 1,234.56, -1,234.56, 123, -123
-        const currencyPattern = /^-?\d{1,3}(?:,?\d{3})*(?:\.\d{1,2})?$/;
+        const currencyPattern = /^-?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?$/;
         
         if (!currencyPattern.test(amountStr)) return null;
         
@@ -527,12 +527,11 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (event) => {
                 const text = event.target.result;
                 
-                // Use Papa Parse for robust CSV parsing
+                // Use custom CSV parser for robust CSV parsing
                 const parseResult = Papa.parse(text, {
                     header: false,
                     skipEmptyLines: true,
                     trimHeaders: true,
-                    delimiter: '', // Auto-detect delimiter
                 });
                 
                 if (parseResult.errors.length > 0) {
@@ -591,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const statusIcon = validation.isValid 
                         ? '<span title="Valid row">✓</span>' 
                         : `<span title="${validation.errors.join('; ')}" style="color: red; cursor: help;">⚠️</span>`;
-                    return `<tr>${statusIcon}${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
+                    return `<tr><td>${statusIcon}</td>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
                 }).join('');
                 
                 previewBody.innerHTML = previewRows;
