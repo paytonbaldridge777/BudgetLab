@@ -201,14 +201,23 @@
         <div class="modal-content">
             <span class="close-btn">&times;</span>
             <h3>Import CSV</h3>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                <strong>Supported formats:</strong> CSV files with headers. Date format: MM/DD/YYYY. 
+                Amount can be positive/negative. Quoted fields and various line endings (CRLF, LF) are supported.
+            </p>
             <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
             <button id="trigger-csv-input" class="btn">Choose CSV File</button>
             <div id="csv-preview-area" class="hidden">
                 <h4>CSV Preview</h4>
-                <table class="table">
-                    <thead id="csv-preview-head"></thead>
-                    <tbody id="csv-preview-body"></tbody>
-                </table>
+                <div id="csv-validation-summary" class="hidden" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 4px;">
+                    <!-- Validation summary will be inserted here -->
+                </div>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="table">
+                        <thead id="csv-preview-head"></thead>
+                        <tbody id="csv-preview-body"></tbody>
+                    </table>
+                </div>
                 <h4>Map Columns</h4>
                 <div class="csv-mapping">
                      <div class="form-group">
@@ -242,6 +251,7 @@
     </div>
 
 
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="app.js" defer></script>
 </body>
 </html>
