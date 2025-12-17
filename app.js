@@ -58,6 +58,113 @@ document.addEventListener('DOMContentLoaded', () => {
         return category ? category.name : 'Uncategorized';
     }
 
+    // --- CSV VALIDATION UTILITIES ---
+    
+    /**
+     * Parse a date string in MM/DD/YYYY format to ISO YYYY-MM-DD
+     * @param {string} dateStr - Date string in MM/DD/YYYY format
+     * @returns {string|null} - ISO date string or null if invalid
+     */
+    function parseDateMMDDYYYY(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        
+        // Trim and check basic format
+        dateStr = dateStr.trim();
+        const parts = dateStr.split('/');
+        
+        if (parts.length !== 3) return null;
+        
+        const month = parseInt(parts[0], 10);
+        const day = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        
+        // Validate ranges
+        if (isNaN(month) || isNaN(day) || isNaN(year)) return null;
+        if (month < 1 || month > 12) return null;
+        if (day < 1 || day > 31) return null;
+        if (year < 1900 || year > 2100) return null;
+        
+        // Create date and validate it's real (e.g., not Feb 31)
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+            return null;
+        }
+        
+        // Return ISO format YYYY-MM-DD
+        const isoMonth = String(month).padStart(2, '0');
+        const isoDay = String(day).padStart(2, '0');
+        return `${year}-${isoMonth}-${isoDay}`;
+    }
+    
+    /**
+     * Validate and parse an amount string
+     * @param {string} amountStr - Amount string (e.g., "-123.45", "1,234.56", "7189.72")
+     * @returns {number|null} - Parsed amount or null if invalid
+     */
+    function validateAndParseAmount(amountStr) {
+        if (!amountStr || typeof amountStr !== 'string') return null;
+        
+        // Trim whitespace
+        amountStr = amountStr.trim();
+        
+        // Match currency pattern with two alternatives:
+        // 1. Numbers with proper comma grouping: -?(\d{1,3}(,\d{3})+)
+        // 2. Numbers without commas (1-10 digits): -?\d{1,10}
+        // Both can have optional decimal part with up to 2 digits
+        // Examples: -123.45, 1234, 7189.72, 1,234.56, -1,234,567.89, 0.24
+        const currencyPattern = /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,10})(?:\.\d{1,2})?$/;
+        
+        if (!currencyPattern.test(amountStr)) return null;
+        
+        // Remove commas and parse
+        const cleaned = amountStr.replace(/,/g, '');
+        const amount = parseFloat(cleaned);
+        
+        if (isNaN(amount)) return null;
+        
+        return amount;
+    }
+    
+    /**
+     * Validate a CSV row
+     * @param {Array} row - Array of cell values
+     * @param {number} expectedColumnCount - Expected number of columns
+     * @param {number} dateColIndex - Index of date column
+     * @param {number} amountColIndex - Index of amount column
+     * @returns {Object} - Validation result with isValid and errors array
+     */
+    function validateCsvRow(row, expectedColumnCount, dateColIndex, amountColIndex) {
+        const errors = [];
+        
+        // Check column count
+        if (row.length !== expectedColumnCount) {
+            errors.push(`Expected ${expectedColumnCount} columns, got ${row.length}`);
+        }
+        
+        // Validate date if column exists
+        if (dateColIndex >= 0 && dateColIndex < row.length) {
+            const dateStr = row[dateColIndex];
+            const parsedDate = parseDateMMDDYYYY(dateStr);
+            if (!parsedDate) {
+                errors.push(`Invalid date format: "${dateStr}" (expected MM/DD/YYYY)`);
+            }
+        }
+        
+        // Validate amount if column exists
+        if (amountColIndex >= 0 && amountColIndex < row.length) {
+            const amountStr = row[amountColIndex];
+            const parsedAmount = validateAndParseAmount(amountStr);
+            if (parsedAmount === null) {
+                errors.push(`Invalid amount format: "${amountStr}"`);
+            }
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    }
+
 
     // --- NAVIGATION ---
     function setupNavigation() {
@@ -409,6 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileInput = document.getElementById('csv-file-input');
         const triggerBtn = document.getElementById('trigger-csv-input');
         const previewArea = document.getElementById('csv-preview-area');
+        const validationSummary = document.getElementById('csv-validation-summary');
         
         openBtn.addEventListener('click', () => modal.classList.remove('hidden'));
         closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
@@ -421,74 +529,231 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const text = event.target.result;
-                const lines = text.split('\n').filter(line => line.trim() !== '');
-                if(lines.length === 0) return;
-
-                const headers = lines[0].split(',').map(h => h.trim());
-                const data = lines.slice(1).map(line => line.split(',').map(item => item.trim()));
                 
-                // Populate preview
+                // Use custom CSV parser for robust CSV parsing
+                const parseResult = Papa.parse(text, {
+                    header: false,
+                    skipEmptyLines: true,
+                    trimHeaders: true,
+                });
+                
+                if (parseResult.errors.length > 0) {
+                    console.warn('CSV parsing warnings:', parseResult.errors);
+                }
+                
+                const allRows = parseResult.data;
+                if (allRows.length === 0) {
+                    alert('CSV file is empty');
+                    return;
+                }
+                
+                const headers = allRows[0].map(h => String(h).trim());
+                const dataRows = allRows.slice(1);
+                
+                // Auto-select columns based on header names
+                const dateColIndex = headers.findIndex(h => /date/i.test(h));
+                const amountColIndex = headers.findIndex(h => /amount|amt|value|total/i.test(h));
+                const descColIndex = headers.findIndex(h => /desc|description|memo|detail/i.test(h));
+                
+                // Validate all rows and store results
+                const rowValidations = dataRows.map(row => 
+                    validateCsvRow(row, headers.length, dateColIndex, amountColIndex)
+                );
+                
+                const validRows = rowValidations.filter(v => v.isValid).length;
+                const invalidRows = rowValidations.filter(v => !v.isValid).length;
+                
+                // Display validation summary
+                if (invalidRows > 0) {
+                    validationSummary.innerHTML = `
+                        <strong>⚠️ Validation Summary:</strong> 
+                        ${validRows} valid row${validRows !== 1 ? 's' : ''}, 
+                        ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)
+                    `;
+                    validationSummary.style.background = '#fff3cd';
+                    validationSummary.style.color = '#856404';
+                    validationSummary.classList.remove('hidden');
+                } else {
+                    validationSummary.innerHTML = `
+                        <strong>✓ Validation Summary:</strong> 
+                        All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully
+                    `;
+                    validationSummary.style.background = '#d4edda';
+                    validationSummary.style.color = '#155724';
+                    validationSummary.classList.remove('hidden');
+                }
+                
+                // Populate preview with validation indicators
                 const previewHead = document.getElementById('csv-preview-head');
                 const previewBody = document.getElementById('csv-preview-body');
-                previewHead.innerHTML = `<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                previewBody.innerHTML = data.slice(0, 5).map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('');
+                previewHead.innerHTML = `<tr><th>Status</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                
+                const previewRows = dataRows.slice(0, 10).map((row, idx) => {
+                    const validation = rowValidations[idx];
+                    const statusIcon = validation.isValid 
+                        ? '<span title="Valid row">✓</span>' 
+                        : `<span title="${validation.errors.join('; ')}" style="color: red; cursor: help;">⚠️</span>`;
+                    return `<tr><td>${statusIcon}</td>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
+                }).join('');
+                
+                previewBody.innerHTML = previewRows;
                 
                 // Populate mapping dropdowns
-                const colSelectors = ['#csv-date-col', '#csv-description-col', '#csv-amount-col'];
-                colSelectors.forEach(selId => {
-                    const select = document.querySelector(selId);
-                    select.innerHTML = headers.map((h, i) => `<option value="${i}">${h}</option>`).join('');
+                const colSelectors = [
+                    { id: '#csv-date-col', autoIndex: dateColIndex },
+                    { id: '#csv-description-col', autoIndex: descColIndex },
+                    { id: '#csv-amount-col', autoIndex: amountColIndex }
+                ];
+                
+                colSelectors.forEach(({id, autoIndex}) => {
+                    const select = document.querySelector(id);
+                    select.innerHTML = headers.map((h, i) => 
+                        `<option value="${i}" ${i === autoIndex ? 'selected' : ''}>${h}</option>`
+                    ).join('');
                 });
 
                 // Populate category dropdown
                 const catSelect = document.getElementById('csv-default-category');
-                catSelect.innerHTML = state.categories.filter(c => c.active).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                catSelect.innerHTML = state.categories.filter(c => c.active).map(c => 
+                    `<option value="${c.id}">${c.name}</option>`
+                ).join('');
 
                 previewArea.classList.remove('hidden');
 
-                // Store parsed data temporarily
-                modal.dataset.csvData = JSON.stringify(data);
+                // Store parsed data and validation results temporarily
+                modal.dataset.csvData = JSON.stringify(dataRows);
+                modal.dataset.csvValidations = JSON.stringify(rowValidations);
+                modal.dataset.csvHeaders = JSON.stringify(headers);
             };
             reader.readAsText(file);
         });
 
+        // Add change listeners to column selectors to re-validate when mapping changes
+        ['#csv-date-col', '#csv-amount-col'].forEach(selector => {
+            document.querySelector(selector).addEventListener('change', () => {
+                const dataRows = JSON.parse(modal.dataset.csvData || '[]');
+                const headers = JSON.parse(modal.dataset.csvHeaders || '[]');
+                if (dataRows.length === 0) return;
+                
+                const dateCol = parseInt(document.getElementById('csv-date-col').value, 10);
+                const amountCol = parseInt(document.getElementById('csv-amount-col').value, 10);
+                
+                // Re-validate with new column mappings
+                const rowValidations = dataRows.map(row => 
+                    validateCsvRow(row, headers.length, dateCol, amountCol)
+                );
+                
+                const validRows = rowValidations.filter(v => v.isValid).length;
+                const invalidRows = rowValidations.filter(v => !v.isValid).length;
+                
+                // Update validation summary
+                if (invalidRows > 0) {
+                    validationSummary.innerHTML = `
+                        <strong>⚠️ Validation Summary:</strong> 
+                        ${validRows} valid row${validRows !== 1 ? 's' : ''}, 
+                        ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)
+                    `;
+                    validationSummary.style.background = '#fff3cd';
+                    validationSummary.style.color = '#856404';
+                } else {
+                    validationSummary.innerHTML = `
+                        <strong>✓ Validation Summary:</strong> 
+                        All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully
+                    `;
+                    validationSummary.style.background = '#d4edda';
+                    validationSummary.style.color = '#155724';
+                }
+                
+                // Update preview status indicators
+                const previewBody = document.getElementById('csv-preview-body');
+                const previewRows = dataRows.slice(0, 10).map((row, idx) => {
+                    const validation = rowValidations[idx];
+                    const statusIcon = validation.isValid 
+                        ? '<span title="Valid row">✓</span>' 
+                        : `<span title="${validation.errors.join('; ')}" style="color: red; cursor: help;">⚠️</span>`;
+                    return `<tr><td>${statusIcon}</td>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
+                }).join('');
+                previewBody.innerHTML = previewRows;
+                
+                // Store updated validations
+                modal.dataset.csvValidations = JSON.stringify(rowValidations);
+            });
+        });
+
         document.getElementById('import-csv-confirm-btn').addEventListener('click', () => {
-            const data = JSON.parse(modal.dataset.csvData || '[]');
-            if (data.length === 0) return;
+            const dataRows = JSON.parse(modal.dataset.csvData || '[]');
+            const rowValidations = JSON.parse(modal.dataset.csvValidations || '[]');
+            if (dataRows.length === 0) return;
 
             const dateCol = parseInt(document.getElementById('csv-date-col').value, 10);
             const descCol = parseInt(document.getElementById('csv-description-col').value, 10);
             const amountCol = parseInt(document.getElementById('csv-amount-col').value, 10);
             
-            const newTransactions = data.map(row => {
-                const amount = parseFloat(row[amountCol].replace(/[^0-9.-]+/g,""));
-                if (isNaN(amount)) return null;
-
-                // Determine type and category based on amount sign
-                // Negative = expense, Positive = income
-                const isExpense = amount < 0;
-                const transactionType = isExpense ? 'expense' : 'income';
+            // Get modal selections for defaults
+            const defaultType = document.getElementById('csv-default-type').value;
+            const defaultCategory = document.getElementById('csv-default-category').value;
+            
+            const newTransactions = [];
+            let skippedCount = 0;
+            
+            dataRows.forEach((row, idx) => {
+                const validation = rowValidations[idx];
                 
-                // Find appropriate default category
-                // Expense defaults to Housing (cat-1), Income defaults to Miscellaneous (cat-9)
-                const defaultCategoryId = isExpense ? 'cat-1' : 'cat-9';
+                // Skip invalid rows
+                if (!validation.isValid) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Parse amount with strict validation
+                const amountStr = row[amountCol];
+                const parsedAmount = validateAndParseAmount(amountStr);
+                
+                if (parsedAmount === null) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Parse date with explicit MM/DD/YYYY format
+                const dateStr = row[dateCol];
+                const parsedDate = parseDateMMDDYYYY(dateStr);
+                
+                if (!parsedDate) {
+                    skippedCount++;
+                    return;
+                }
+                
+                // Determine transaction type
+                // If amount has a sign, use it; otherwise use modal default
+                let transactionType = defaultType;
+                if (parsedAmount !== 0) {
+                    // Negative = expense, Positive = income
+                    transactionType = parsedAmount < 0 ? 'expense' : 'income';
+                }
+                
+                // Use modal default category
+                const categoryId = defaultCategory;
 
-                return {
+                newTransactions.push({
                     id: generateId(),
-                    date: new Date(row[dateCol]).toISOString().slice(0, 10),
+                    date: parsedDate,
                     description: row[descCol],
-                    amount: Math.abs(amount),
+                    amount: Math.abs(parsedAmount),
                     type: transactionType,
-                    categoryId: defaultCategoryId,
+                    categoryId: categoryId,
                     source: 'csv'
-                };
-            }).filter(Boolean); // Filter out any nulls from failed parsing
+                });
+            });
 
             state.transactions.push(...newTransactions);
             saveData('transactions');
             renderAll();
             modal.classList.add('hidden');
-            alert(`${newTransactions.length} transactions imported.`);
+            
+            const message = skippedCount > 0 
+                ? `${newTransactions.length} transactions imported, ${skippedCount} row${skippedCount !== 1 ? 's' : ''} skipped due to validation errors.`
+                : `${newTransactions.length} transactions imported successfully.`;
+            alert(message);
         });
     }
 
