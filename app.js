@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE MANAGEMENT ---
     const state = {
         categories: [],
+        sources: [],
         transactions: [],
         monthlyBudgets: [],
         selectedMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
@@ -17,11 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATA HELPERS ---
     const DB_KEYS = {
         categories: 'budget_categories',
+        sources: 'budget_sources',
         transactions: 'budget_transactions',
         monthlyBudgets: 'budget_monthlyBudgets'
     };
     
     const DEFAULT_CATEGORIES = [
+        { id: 'cat-transfer', name: 'Transfer', active: true, isTransfer: true },
         { id: 'cat-1', name: 'Housing', active: true },
         { id: 'cat-2', name: 'Utilities', active: true },
         { id: 'cat-3', name: 'Groceries', active: true },
@@ -32,6 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'cat-8', name: 'Entertainment', active: true },
         { id: 'cat-9', name: 'Miscellaneous', active: true }
     ];
+    
+    const DEFAULT_SOURCES = [
+        { id: 'source-1', name: 'Wells Fargo', active: true },
+        { id: 'source-2', name: 'Amazon Visa', active: true }
+    ];
 
     function loadData() {
         state.categories = JSON.parse(localStorage.getItem(DB_KEYS.categories)) || [];
@@ -39,8 +47,24 @@ document.addEventListener('DOMContentLoaded', () => {
             state.categories = DEFAULT_CATEGORIES;
             saveData('categories');
         }
+        
+        // Ensure Transfer category exists
+        if (!state.categories.find(c => c.id === 'cat-transfer')) {
+            state.categories.unshift({ id: 'cat-transfer', name: 'Transfer', active: true, isTransfer: true });
+            saveData('categories');
+        }
+        
+        state.sources = JSON.parse(localStorage.getItem(DB_KEYS.sources)) || [];
+        if (state.sources.length === 0) {
+            state.sources = DEFAULT_SOURCES;
+            saveData('sources');
+        }
+        
         state.transactions = JSON.parse(localStorage.getItem(DB_KEYS.transactions)) || [];
         state.monthlyBudgets = JSON.parse(localStorage.getItem(DB_KEYS.monthlyBudgets)) || [];
+        
+        // Migrate existing transactions
+        migrateTransactions();
     }
 
     function saveData(key) {
@@ -56,6 +80,44 @@ document.addEventListener('DOMContentLoaded', () => {
     function getCategoryName(categoryId) {
         const category = state.categories.find(c => c.id === categoryId);
         return category ? category.name : 'Uncategorized';
+    }
+    
+    function getSourceName(sourceId) {
+        const source = state.sources.find(s => s.id === sourceId);
+        return source ? source.name : 'Unknown';
+    }
+    
+    function migrateTransactions() {
+        let migrated = false;
+        state.transactions.forEach(tx => {
+            // Migrate source field to importType
+            if (tx.source && !tx.importType) {
+                if (tx.source === 'csv' || tx.source === 'imported') {
+                    tx.importType = 'imported';
+                } else if (tx.source === 'manual') {
+                    tx.importType = 'manual';
+                } else {
+                    tx.importType = 'manual'; // Default
+                }
+                delete tx.source;
+                migrated = true;
+            }
+            
+            // Add sourceId if missing
+            if (!tx.sourceId && state.sources.length > 0) {
+                tx.sourceId = state.sources[0].id; // Default to first source
+                migrated = true;
+            }
+        });
+        
+        if (migrated) {
+            saveData('transactions');
+        }
+    }
+    
+    function isTransferCategory(categoryId) {
+        const category = state.categories.find(c => c.id === categoryId);
+        return category?.isTransfer === true;
     }
 
     // --- CSV VALIDATION UTILITIES ---
@@ -227,10 +289,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderBudget();
         renderTransactions();
         renderCategories();
+        renderSources();
     }
     
     function renderDashboard() {
-        const transactionsForMonth = state.transactions.filter(t => t.date.startsWith(state.selectedMonth));
+        const transactionsForMonth = state.transactions
+            .filter(t => t.date.startsWith(state.selectedMonth))
+            .filter(t => !isTransferCategory(t.categoryId)); // Exclude transfers
         
         const totalIncome = transactionsForMonth
             .filter(t => t.type === 'income')
@@ -248,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const breakdownBody = document.getElementById('category-breakdown-body');
         breakdownBody.innerHTML = '';
-        state.categories.filter(c => c.active).forEach(category => {
+        state.categories.filter(c => c.active && !c.isTransfer).forEach(category => {
             const actualSpent = transactionsForMonth
                 .filter(t => t.categoryId === category.id && t.type === 'expense')
                 .reduce((sum, t) => sum + t.amount, 0);
@@ -271,9 +336,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderBudget() {
         const budgetBody = document.getElementById('budget-table-body');
         budgetBody.innerHTML = '';
-        const transactionsForMonth = state.transactions.filter(t => t.date.startsWith(state.selectedMonth));
+        const transactionsForMonth = state.transactions
+            .filter(t => t.date.startsWith(state.selectedMonth))
+            .filter(t => !isTransferCategory(t.categoryId)); // Exclude transfers
 
-        state.categories.filter(c => c.active).forEach(category => {
+        state.categories.filter(c => c.active && !c.isTransfer).forEach(category => {
             const budget = state.monthlyBudgets.find(b => b.month === state.selectedMonth && b.categoryId === category.id);
             const budgetedAmount = budget ? budget.amount : 0;
             
@@ -305,23 +372,86 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTransactions() {
         const transactionBody = document.getElementById('transactions-table-body');
-        const filterText = document.getElementById('transaction-filter').value.toLowerCase();
+        const filterText = document.getElementById('transaction-filter')?.value.toLowerCase() || '';
         transactionBody.innerHTML = '';
+        
+        // Populate filter dropdowns
+        const filterSource = document.getElementById('filter-source');
+        if (filterSource) {
+            const currentSourceFilter = filterSource.value;
+            filterSource.innerHTML = '<option value="all">All Sources</option>';
+            state.sources.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s.id;
+                option.textContent = s.name;
+                filterSource.appendChild(option);
+            });
+            filterSource.value = currentSourceFilter;
+        }
+        
+        const filterCategory = document.getElementById('filter-category');
+        if (filterCategory) {
+            const currentCategoryFilter = filterCategory.value;
+            filterCategory.innerHTML = '<option value="all">All Categories</option>';
+            state.categories.filter(c => c.active).forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = c.name;
+                filterCategory.appendChild(option);
+            });
+            filterCategory.value = currentCategoryFilter;
+        }
 
-        const transactionsForMonth = state.transactions
-            .filter(t => t.date.startsWith(state.selectedMonth))
+        // Apply bulk delete filters
+        let transactionsForMonth = state.transactions.filter(t => t.date.startsWith(state.selectedMonth));
+        
+        // Apply filter panel filters if they exist
+        const filterFromDate = document.getElementById('filter-from-date')?.value;
+        const filterToDate = document.getElementById('filter-to-date')?.value;
+        const filterSource = document.getElementById('filter-source')?.value;
+        const filterCategory = document.getElementById('filter-category')?.value;
+        const filterType = document.getElementById('filter-type')?.value;
+        const filterImportType = document.getElementById('filter-import-type')?.value;
+        
+        if (filterFromDate) {
+            transactionsForMonth = transactionsForMonth.filter(t => t.date >= filterFromDate);
+        }
+        if (filterToDate) {
+            transactionsForMonth = transactionsForMonth.filter(t => t.date <= filterToDate);
+        }
+        if (filterSource && filterSource !== 'all') {
+            transactionsForMonth = transactionsForMonth.filter(t => t.sourceId === filterSource);
+        }
+        if (filterCategory && filterCategory !== 'all') {
+            transactionsForMonth = transactionsForMonth.filter(t => t.categoryId === filterCategory);
+        }
+        if (filterType && filterType !== 'all') {
+            transactionsForMonth = transactionsForMonth.filter(t => t.type === filterType);
+        }
+        if (filterImportType && filterImportType !== 'all') {
+            transactionsForMonth = transactionsForMonth.filter(t => t.importType === filterImportType);
+        }
+        
+        transactionsForMonth = transactionsForMonth
             .filter(t => t.description.toLowerCase().includes(filterText))
             .sort((a, b) => new Date(b.date) - new Date(a.date));
 
         transactionsForMonth.forEach(tx => {
+            const isTransfer = isTransferCategory(tx.categoryId);
+            const categoryName = getCategoryName(tx.categoryId);
+            const categoryDisplay = isTransfer ? `🔄 ${categoryName}` : categoryName;
+            const importTypeDisplay = tx.importType === 'imported' ? 'Imported' : 'Manual';
+            
             const row = document.createElement('tr');
             row.innerHTML = `
+                <td><input type="checkbox" class="transaction-checkbox" data-id="${tx.id}"></td>
                 <td>${tx.date}</td>
                 <td>${tx.description}</td>
-                <td>${getCategoryName(tx.categoryId)}</td>
+                <td>${categoryDisplay}</td>
                 <td>${tx.type}</td>
                 <td>$${tx.amount.toFixed(2)}</td>
-                <td>${tx.source}</td>
+                <td>${getSourceName(tx.sourceId)}</td>
+                <td>${importTypeDisplay}</td>
                 <td class="table-actions">
                     <button class="btn btn-sm" data-action="edit" data-id="${tx.id}">Edit</button>
                     <button class="btn btn-sm btn-danger" data-action="delete" data-id="${tx.id}">Delete</button>
@@ -329,6 +459,10 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             transactionBody.appendChild(row);
         });
+        
+        // Update select all checkbox state
+        updateSelectAllCheckbox();
+        updateDeleteSelectedButton();
     }
 
     function renderCategories() {
@@ -337,19 +471,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.categories.forEach(cat => {
             const row = document.createElement('tr');
+            const isTransfer = cat.isTransfer === true;
+            const nameField = isTransfer 
+                ? `<input type="text" class="form-input category-name-input" value="${cat.name}" data-id="${cat.id}" disabled title="Transfer category cannot be renamed">`
+                : `<input type="text" class="form-input category-name-input" value="${cat.name}" data-id="${cat.id}">`;
+            
             row.innerHTML = `
+                <td>${nameField}</td>
                 <td>
-                    <input type="text" class="form-input category-name-input" value="${cat.name}" data-id="${cat.id}">
+                    <input type="checkbox" class="category-active-toggle" ${cat.active ? 'checked' : ''} data-id="${cat.id}" ${isTransfer ? 'disabled' : ''}>
                 </td>
                 <td>
-                    <input type="checkbox" class="category-active-toggle" ${cat.active ? 'checked' : ''} data-id="${cat.id}">
-                </td>
-                <td>
-                    <button class="btn btn-primary btn-sm" data-action="save-cat" data-id="${cat.id}">Save</button>
+                    <button class="btn btn-primary btn-sm" data-action="save-cat" data-id="${cat.id}" ${isTransfer ? 'disabled' : ''}>Save</button>
                 </td>
             `;
             categoryBody.appendChild(row);
         });
+    }
+    
+    function renderSources() {
+        const sourceBody = document.getElementById('sources-table-body');
+        if (!sourceBody) return;
+        sourceBody.innerHTML = '';
+
+        state.sources.forEach(src => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input type="text" class="form-input source-name-input" value="${src.name}" data-id="${src.id}">
+                </td>
+                <td>
+                    <input type="checkbox" class="source-active-toggle" ${src.active ? 'checked' : ''} data-id="${src.id}">
+                </td>
+                <td>
+                    <button class="btn btn-primary btn-sm" data-action="save-source" data-id="${src.id}">Save</button>
+                </td>
+            `;
+            sourceBody.appendChild(row);
+        });
+    }
+    
+    function updateSelectAllCheckbox() {
+        const selectAllCheckbox = document.getElementById('select-all-transactions');
+        if (!selectAllCheckbox) return;
+        
+        const checkboxes = document.querySelectorAll('.transaction-checkbox');
+        const checkedCount = document.querySelectorAll('.transaction-checkbox:checked').length;
+        
+        selectAllCheckbox.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+    }
+    
+    function updateDeleteSelectedButton() {
+        const deleteBtn = document.getElementById('delete-selected-btn');
+        if (!deleteBtn) return;
+        
+        const checkedCount = document.querySelectorAll('.transaction-checkbox:checked').length;
+        deleteBtn.textContent = `Delete Selected (${checkedCount})`;
+        deleteBtn.disabled = checkedCount === 0;
     }
 
     // --- EVENT LISTENERS ---
@@ -400,14 +579,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 categorySelect.appendChild(option);
             });
             
+            // Populate sources dropdown
+            const sourceSelect = document.getElementById('transaction-source');
+            if (sourceSelect) {
+                sourceSelect.innerHTML = '<option value="">Select source...</option>';
+                state.sources.filter(s => s.active).forEach(s => {
+                    const option = document.createElement('option');
+                    option.value = s.id;
+                    option.textContent = s.name;
+                    sourceSelect.appendChild(option);
+                });
+            }
+            
             if (tx) {
                 document.getElementById('transaction-date').value = tx.date;
                 document.getElementById('transaction-description').value = tx.description;
                 document.getElementById('transaction-amount').value = tx.amount;
                 document.getElementById('transaction-type').value = tx.type;
                 document.getElementById('transaction-category').value = tx.categoryId;
+                if (sourceSelect && tx.sourceId) {
+                    sourceSelect.value = tx.sourceId;
+                }
             } else {
-                 document.getElementById('transaction-date').valueAsDate = new Date();
+                document.getElementById('transaction-date').valueAsDate = new Date();
+                // Set default source to first active source
+                if (sourceSelect && state.sources.length > 0) {
+                    const firstActiveSource = state.sources.find(s => s.active);
+                    if (firstActiveSource) {
+                        sourceSelect.value = firstActiveSource.id;
+                    }
+                }
             }
             
             modal.classList.remove('hidden');
@@ -424,13 +625,17 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const id = document.getElementById('transaction-id').value;
+            const sourceSelect = document.getElementById('transaction-source');
+            const sourceId = sourceSelect ? sourceSelect.value : (state.sources.length > 0 ? state.sources[0].id : null);
+            
             const transactionData = {
                 date: document.getElementById('transaction-date').value,
                 description: document.getElementById('transaction-description').value,
                 amount: parseFloat(document.getElementById('transaction-amount').value),
                 type: document.getElementById('transaction-type').value,
                 categoryId: document.getElementById('transaction-category').value,
-                source: 'manual'
+                sourceId: sourceId,
+                importType: 'manual'
             };
 
             if (id) { // Editing existing
@@ -468,6 +673,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Filter
         document.getElementById('transaction-filter').addEventListener('input', renderTransactions);
+        
+        // Select All checkbox
+        const selectAllCheckbox = document.getElementById('select-all-transactions');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const checkboxes = document.querySelectorAll('.transaction-checkbox');
+                checkboxes.forEach(cb => cb.checked = e.target.checked);
+                updateDeleteSelectedButton();
+            });
+        }
+        
+        // Individual checkboxes
+        document.getElementById('transactions-table-body').addEventListener('change', (e) => {
+            if (e.target.classList.contains('transaction-checkbox')) {
+                updateSelectAllCheckbox();
+                updateDeleteSelectedButton();
+            }
+        });
+        
+        // Clear All button
+        const clearAllBtn = document.getElementById('clear-all-transactions-btn');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to delete all transactions? This cannot be undone.')) {
+                    state.transactions = [];
+                    saveData('transactions');
+                    renderAll();
+                }
+            });
+        }
+        
+        // Delete Selected button
+        const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', () => {
+                const checkedBoxes = document.querySelectorAll('.transaction-checkbox:checked');
+                const selectedIds = Array.from(checkedBoxes).map(cb => cb.dataset.id);
+                
+                if (selectedIds.length === 0) return;
+                
+                if (confirm(`Are you sure you want to delete ${selectedIds.length} transaction(s)? This cannot be undone.`)) {
+                    state.transactions = state.transactions.filter(t => !selectedIds.includes(t.id));
+                    saveData('transactions');
+                    renderAll();
+                }
+            });
+        }
+        
+        // Filter panel listeners
+        const filterElements = [
+            'filter-from-date', 'filter-to-date', 'filter-source', 
+            'filter-category', 'filter-type', 'filter-import-type'
+        ];
+        filterElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('change', renderTransactions);
+            }
+        });
+        
+        // Clear filters button
+        const clearFiltersBtn = document.getElementById('clear-filters-btn');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => {
+                filterElements.forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.value = element.tagName === 'SELECT' ? 'all' : '';
+                    }
+                });
+                renderTransactions();
+            });
+        }
     }
     
     // Categories Management
@@ -506,6 +784,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+    }
+    
+    // Sources Management
+    function setupSources() {
+        const addSourceBtn = document.getElementById('add-source-btn');
+        if (addSourceBtn) {
+            addSourceBtn.addEventListener('click', () => {
+                const nameInput = document.getElementById('new-source-name');
+                const name = nameInput.value.trim();
+                if (name) {
+                    state.sources.push({ id: generateId(), name, active: true });
+                    saveData('sources');
+                    renderSources();
+                    renderAll(); // Update dropdowns
+                    nameInput.value = '';
+                }
+            });
+        }
+
+        const sourcesTableBody = document.getElementById('sources-table-body');
+        if (sourcesTableBody) {
+            sourcesTableBody.addEventListener('click', e => {
+                const target = e.target;
+                const id = target.dataset.id;
+                if (!id) return;
+
+                const source = state.sources.find(s => s.id === id);
+                if (!source) return;
+                
+                if (target.matches('.source-active-toggle')) {
+                    source.active = target.checked;
+                    saveData('sources');
+                    renderAll(); // Re-render all to update dropdowns, etc.
+                } else if (target.matches('[data-action="save-source"]')) {
+                    const nameInput = target.closest('tr').querySelector('.source-name-input');
+                    const newName = nameInput.value.trim();
+                    if (newName && newName !== source.name) {
+                        source.name = newName;
+                        saveData('sources');
+                        renderAll();
+                        alert('Source updated!');
+                    }
+                }
+            });
+        }
     }
 
     // CSV Import Modal
@@ -617,6 +940,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 catSelect.innerHTML = state.categories.filter(c => c.active).map(c => 
                     `<option value="${c.id}">${c.name}</option>`
                 ).join('');
+                
+                // Populate source dropdown
+                const sourceSelect = document.getElementById('csv-source');
+                if (sourceSelect) {
+                    sourceSelect.innerHTML = state.sources.filter(s => s.active).map(s => 
+                        `<option value="${s.id}">${s.name}</option>`
+                    ).join('');
+                }
 
                 previewArea.classList.remove('hidden');
 
@@ -692,6 +1023,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Get modal selections for defaults
             const defaultType = document.getElementById('csv-default-type').value;
             const defaultCategory = document.getElementById('csv-default-category').value;
+            const sourceSelect = document.getElementById('csv-source');
+            const sourceId = sourceSelect ? sourceSelect.value : (state.sources.length > 0 ? state.sources[0].id : null);
             
             const newTransactions = [];
             let skippedCount = 0;
@@ -741,7 +1074,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     amount: Math.abs(parsedAmount),
                     type: transactionType,
                     categoryId: categoryId,
-                    source: 'csv'
+                    sourceId: sourceId,
+                    importType: 'imported'
                 });
             });
 
@@ -828,8 +1162,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setupMonthSelectors();
         setupTransactionModal();
         setupCategories();
+        setupSources();
         setupCsvImportModal();
-        setupDataManagement(); // Added this line
+        setupDataManagement();
         renderAll();
     }
 
