@@ -14,6 +14,7 @@
             <a href="#" class="nav-link" data-section="budget">Budget</a>
             <a href="#" class="nav-link" data-section="transactions">Transactions</a>
             <a href="#" class="nav-link" data-section="categories">Categories</a>
+            <a href="#" class="nav-link" data-section="sources">Sources</a>
         </div>
     </nav>
 
@@ -111,17 +112,71 @@
                 <div class="transaction-actions">
                     <button id="add-transaction-btn" class="btn btn-primary">Add Transaction</button>
                     <button id="import-csv-btn" class="btn">Import CSV</button>
+                    <button id="clear-all-transactions-btn" class="btn btn-danger">Clear All</button>
                 </div>
+                
+                <!-- Filter Panel -->
+                <div class="filter-panel">
+                    <h4>Filter Transactions</h4>
+                    <div class="filter-grid">
+                        <div class="form-group">
+                            <label for="filter-from-date">From Date</label>
+                            <input type="date" id="filter-from-date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-to-date">To Date</label>
+                            <input type="date" id="filter-to-date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-source">Source</label>
+                            <select id="filter-source" class="form-input">
+                                <option value="all">All Sources</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-category">Category</label>
+                            <select id="filter-category" class="form-input">
+                                <option value="all">All Categories</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-type">Type</label>
+                            <select id="filter-type" class="form-input">
+                                <option value="all">All Types</option>
+                                <option value="income">Income</option>
+                                <option value="expense">Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="filter-import-type">Import Type</label>
+                            <select id="filter-import-type" class="form-input">
+                                <option value="all">All Import Types</option>
+                                <option value="manual">Manual</option>
+                                <option value="imported">Imported</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="clear-filters-btn" class="btn">Clear Filters</button>
+                </div>
+                
                 <input type="text" id="transaction-filter" placeholder="Filter by description..." class="form-input">
+                
+                <!-- Bulk Actions -->
+                <div class="bulk-actions">
+                    <button id="delete-selected-btn" class="btn btn-danger" disabled>Delete Selected (0)</button>
+                </div>
+                
                 <table class="table">
                     <thead>
                         <tr>
+                            <th><input type="checkbox" id="select-all-transactions"></th>
                             <th>Date</th>
                             <th>Description</th>
                             <th>Category</th>
                             <th>Type</th>
                             <th>Amount</th>
                             <th>Source</th>
+                            <th>Import Type</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -158,6 +213,34 @@
                 </div>
             </div>
         </section>
+        
+        <!-- Sources Section -->
+        <section id="sources" class="section hidden">
+            <div class="section-header">
+                <h2>Sources</h2>
+            </div>
+            <div class="card">
+                <h3>Manage Sources</h3>
+                <p style="color: #666; font-size: 0.9em;">Sources represent financial institutions like banks or credit card companies.</p>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Source Name</th>
+                            <th>Active?</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sources-table-body">
+                        <!-- Rows will be injected by JS -->
+                    </tbody>
+                </table>
+                <h3>Add New Source</h3>
+                <div class="add-category-form">
+                    <input type="text" id="new-source-name" placeholder="New source name" class="form-input">
+                    <button id="add-source-btn" class="btn btn-primary">Add Source</button>
+                </div>
+            </div>
+        </section>
     </main>
     
     <!-- Modals -->
@@ -189,6 +272,12 @@
                 <div class="form-group">
                     <label for="transaction-category">Category</label>
                     <select id="transaction-category" class="form-input" required>
+                        <!-- Options will be injected by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="transaction-source">Source</label>
+                    <select id="transaction-source" class="form-input" required>
                         <!-- Options will be injected by JS -->
                     </select>
                 </div>
@@ -244,6 +333,11 @@
                  <div class="form-group">
                     <label for="csv-default-category">Default Category for Imported Rows</label>
                     <select id="csv-default-category" class="form-input"></select>
+                </div>
+                <div class="form-group">
+                    <label for="csv-source">Source</label>
+                    <p style="font-size: 0.85em; color: #666; margin: 5px 0;">Select the financial institution for this import</p>
+                    <select id="csv-source" class="form-input"></select>
                 </div>
                 <button id="import-csv-confirm-btn" class="btn btn-primary">Import Transactions</button>
             </div>

@@ -285,6 +285,52 @@ body {
 }
 
 
+/* --- Filter Panel --- */
+.filter-panel {
+    background-color: #f9fafb;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.filter-panel h4 {
+    margin: 0 0 15px 0;
+    font-size: 1rem;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.filter-grid .form-group {
+    margin-bottom: 0;
+}
+
+/* --- Bulk Actions --- */
+.bulk-actions {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* --- Checkbox styling --- */
+.transaction-checkbox {
+    cursor: pointer;
+}
+
+#select-all-transactions {
+    cursor: pointer;
+}
+
 /* --- Responsive Design --- */
 @media (max-width: 768px) {
     .section-header {
@@ -299,5 +345,9 @@ body {
     
     .table-container {
         overflow-x: auto;
+    }
+    
+    .filter-grid {
+        grid-template-columns: 1fr;
     }
 }
