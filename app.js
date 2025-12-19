@@ -443,20 +443,64 @@ document.addEventListener('DOMContentLoaded', () => {
             const importTypeDisplay = tx.importType === 'imported' ? 'Imported' : 'Manual';
             
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><input type="checkbox" class="transaction-checkbox" data-id="${tx.id}"></td>
-                <td>${tx.date}</td>
-                <td>${tx.description}</td>
-                <td>${categoryDisplay}</td>
-                <td>${tx.type}</td>
-                <td>$${tx.amount.toFixed(2)}</td>
-                <td>${getSourceName(tx.sourceId)}</td>
-                <td>${importTypeDisplay}</td>
-                <td class="table-actions">
-                    <button class="btn btn-sm" data-action="edit" data-id="${tx.id}">Edit</button>
-                    <button class="btn btn-sm btn-danger" data-action="delete" data-id="${tx.id}">Delete</button>
-                </td>
-            `;
+            
+            // Create cells safely to prevent XSS
+            const checkboxCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'transaction-checkbox';
+            checkbox.dataset.id = tx.id;
+            checkboxCell.appendChild(checkbox);
+            
+            const dateCell = document.createElement('td');
+            dateCell.textContent = tx.date;
+            
+            const descCell = document.createElement('td');
+            descCell.textContent = tx.description;
+            
+            const catCell = document.createElement('td');
+            catCell.textContent = categoryDisplay;
+            
+            const typeCell = document.createElement('td');
+            typeCell.textContent = tx.type;
+            
+            const amountCell = document.createElement('td');
+            amountCell.textContent = `$${tx.amount.toFixed(2)}`;
+            
+            const sourceCell = document.createElement('td');
+            sourceCell.textContent = getSourceName(tx.sourceId);
+            
+            const importTypeCell = document.createElement('td');
+            importTypeCell.textContent = importTypeDisplay;
+            
+            const actionsCell = document.createElement('td');
+            actionsCell.className = 'table-actions';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn btn-sm';
+            editBtn.dataset.action = 'edit';
+            editBtn.dataset.id = tx.id;
+            editBtn.textContent = 'Edit';
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-sm btn-danger';
+            deleteBtn.dataset.action = 'delete';
+            deleteBtn.dataset.id = tx.id;
+            deleteBtn.textContent = 'Delete';
+            
+            actionsCell.appendChild(editBtn);
+            actionsCell.appendChild(deleteBtn);
+            
+            row.appendChild(checkboxCell);
+            row.appendChild(dateCell);
+            row.appendChild(descCell);
+            row.appendChild(catCell);
+            row.appendChild(typeCell);
+            row.appendChild(amountCell);
+            row.appendChild(sourceCell);
+            row.appendChild(importTypeCell);
+            row.appendChild(actionsCell);
+            
             transactionBody.appendChild(row);
         });
         
@@ -472,19 +516,47 @@ document.addEventListener('DOMContentLoaded', () => {
         state.categories.forEach(cat => {
             const row = document.createElement('tr');
             const isTransfer = cat.isTransfer === true;
-            const nameField = isTransfer 
-                ? `<input type="text" class="form-input category-name-input" value="${cat.name}" data-id="${cat.id}" disabled title="Transfer category cannot be renamed">`
-                : `<input type="text" class="form-input category-name-input" value="${cat.name}" data-id="${cat.id}">`;
             
-            row.innerHTML = `
-                <td>${nameField}</td>
-                <td>
-                    <input type="checkbox" class="category-active-toggle" ${cat.active ? 'checked' : ''} data-id="${cat.id}" ${isTransfer ? 'disabled' : ''}>
-                </td>
-                <td>
-                    <button class="btn btn-primary btn-sm" data-action="save-cat" data-id="${cat.id}" ${isTransfer ? 'disabled' : ''}>Save</button>
-                </td>
-            `;
+            // Create name input cell
+            const nameCell = document.createElement('td');
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'form-input category-name-input';
+            nameInput.value = cat.name;
+            nameInput.dataset.id = cat.id;
+            if (isTransfer) {
+                nameInput.disabled = true;
+                nameInput.title = 'Transfer category cannot be renamed';
+            }
+            nameCell.appendChild(nameInput);
+            
+            // Create active checkbox cell
+            const activeCell = document.createElement('td');
+            const activeCheckbox = document.createElement('input');
+            activeCheckbox.type = 'checkbox';
+            activeCheckbox.className = 'category-active-toggle';
+            activeCheckbox.checked = cat.active;
+            activeCheckbox.dataset.id = cat.id;
+            if (isTransfer) {
+                activeCheckbox.disabled = true;
+            }
+            activeCell.appendChild(activeCheckbox);
+            
+            // Create save button cell
+            const saveCell = document.createElement('td');
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn btn-primary btn-sm';
+            saveBtn.dataset.action = 'save-cat';
+            saveBtn.dataset.id = cat.id;
+            saveBtn.textContent = 'Save';
+            if (isTransfer) {
+                saveBtn.disabled = true;
+            }
+            saveCell.appendChild(saveBtn);
+            
+            row.appendChild(nameCell);
+            row.appendChild(activeCell);
+            row.appendChild(saveCell);
             categoryBody.appendChild(row);
         });
     }
@@ -496,17 +568,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.sources.forEach(src => {
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>
-                    <input type="text" class="form-input source-name-input" value="${src.name}" data-id="${src.id}">
-                </td>
-                <td>
-                    <input type="checkbox" class="source-active-toggle" ${src.active ? 'checked' : ''} data-id="${src.id}">
-                </td>
-                <td>
-                    <button class="btn btn-primary btn-sm" data-action="save-source" data-id="${src.id}">Save</button>
-                </td>
-            `;
+            
+            // Create name input cell
+            const nameCell = document.createElement('td');
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'form-input source-name-input';
+            nameInput.value = src.name;
+            nameInput.dataset.id = src.id;
+            nameCell.appendChild(nameInput);
+            
+            // Create active checkbox cell
+            const activeCell = document.createElement('td');
+            const activeCheckbox = document.createElement('input');
+            activeCheckbox.type = 'checkbox';
+            activeCheckbox.className = 'source-active-toggle';
+            activeCheckbox.checked = src.active;
+            activeCheckbox.dataset.id = src.id;
+            activeCell.appendChild(activeCheckbox);
+            
+            // Create save button cell
+            const saveCell = document.createElement('td');
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'btn btn-primary btn-sm';
+            saveBtn.dataset.action = 'save-source';
+            saveBtn.dataset.id = src.id;
+            saveBtn.textContent = 'Save';
+            saveCell.appendChild(saveBtn);
+            
+            row.appendChild(nameCell);
+            row.appendChild(activeCell);
+            row.appendChild(saveCell);
             sourceBody.appendChild(row);
         });
     }
