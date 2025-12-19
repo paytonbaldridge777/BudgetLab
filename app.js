@@ -999,20 +999,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const invalidRows = rowValidations.filter(v => !v.isValid).length;
                 
                 // Display validation summary
+                validationSummary.innerHTML = '';
+                const strong = document.createElement('strong');
                 if (invalidRows > 0) {
-                    validationSummary.innerHTML = `
-                        <strong>⚠️ Validation Summary:</strong> 
-                        ${validRows} valid row${validRows !== 1 ? 's' : ''}, 
-                        ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)
-                    `;
+                    strong.textContent = '⚠️ Validation Summary:';
+                    validationSummary.appendChild(strong);
+                    validationSummary.appendChild(document.createTextNode(` ${validRows} valid row${validRows !== 1 ? 's' : ''}, ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)`));
                     validationSummary.style.background = '#fff3cd';
                     validationSummary.style.color = '#856404';
                     validationSummary.classList.remove('hidden');
                 } else {
-                    validationSummary.innerHTML = `
-                        <strong>✓ Validation Summary:</strong> 
-                        All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully
-                    `;
+                    strong.textContent = '✓ Validation Summary:';
+                    validationSummary.appendChild(strong);
+                    validationSummary.appendChild(document.createTextNode(` All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully`));
                     validationSummary.style.background = '#d4edda';
                     validationSummary.style.color = '#155724';
                     validationSummary.classList.remove('hidden');
@@ -1136,33 +1135,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 const invalidRows = rowValidations.filter(v => !v.isValid).length;
                 
                 // Update validation summary
+                validationSummary.innerHTML = '';
+                const strong = document.createElement('strong');
                 if (invalidRows > 0) {
-                    validationSummary.innerHTML = `
-                        <strong>⚠️ Validation Summary:</strong> 
-                        ${validRows} valid row${validRows !== 1 ? 's' : ''}, 
-                        ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)
-                    `;
+                    strong.textContent = '⚠️ Validation Summary:';
+                    validationSummary.appendChild(strong);
+                    validationSummary.appendChild(document.createTextNode(` ${validRows} valid row${validRows !== 1 ? 's' : ''}, ${invalidRows} invalid row${invalidRows !== 1 ? 's' : ''} (will be skipped during import)`));
                     validationSummary.style.background = '#fff3cd';
                     validationSummary.style.color = '#856404';
                 } else {
-                    validationSummary.innerHTML = `
-                        <strong>✓ Validation Summary:</strong> 
-                        All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully
-                    `;
+                    strong.textContent = '✓ Validation Summary:';
+                    validationSummary.appendChild(strong);
+                    validationSummary.appendChild(document.createTextNode(` All ${validRows} row${validRows !== 1 ? 's' : ''} validated successfully`));
                     validationSummary.style.background = '#d4edda';
                     validationSummary.style.color = '#155724';
                 }
                 
                 // Update preview status indicators
                 const previewBody = document.getElementById('csv-preview-body');
-                const previewRows = dataRows.slice(0, 10).map((row, idx) => {
+                previewBody.innerHTML = '';
+                dataRows.slice(0, 10).forEach((row, idx) => {
                     const validation = rowValidations[idx];
-                    const statusIcon = validation.isValid 
-                        ? '<span title="Valid row">✓</span>' 
-                        : `<span title="${validation.errors.join('; ')}" style="color: red; cursor: help;">⚠️</span>`;
-                    return `<tr><td>${statusIcon}</td>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
-                }).join('');
-                previewBody.innerHTML = previewRows;
+                    const tr = document.createElement('tr');
+                    
+                    const statusCell = document.createElement('td');
+                    const statusSpan = document.createElement('span');
+                    if (validation.isValid) {
+                        statusSpan.textContent = '✓';
+                        statusSpan.title = 'Valid row';
+                    } else {
+                        statusSpan.textContent = '⚠️';
+                        statusSpan.title = validation.errors.join('; ');
+                        statusSpan.style.color = 'red';
+                        statusSpan.style.cursor = 'help';
+                    }
+                    statusCell.appendChild(statusSpan);
+                    tr.appendChild(statusCell);
+                    
+                    row.forEach(cell => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    
+                    previewBody.appendChild(tr);
+                });
                 
                 // Store updated validations
                 modal.dataset.csvValidations = JSON.stringify(rowValidations);
