@@ -376,30 +376,30 @@ document.addEventListener('DOMContentLoaded', () => {
         transactionBody.innerHTML = '';
         
         // Populate filter dropdowns
-        const filterSource = document.getElementById('filter-source');
-        if (filterSource) {
-            const currentSourceFilter = filterSource.value;
-            filterSource.innerHTML = '<option value="all">All Sources</option>';
+        const filterSourceEl = document.getElementById('filter-source');
+        if (filterSourceEl) {
+            const currentSourceFilter = filterSourceEl.value;
+            filterSourceEl.innerHTML = '<option value="all">All Sources</option>';
             state.sources.forEach(s => {
                 const option = document.createElement('option');
                 option.value = s.id;
                 option.textContent = s.name;
-                filterSource.appendChild(option);
+                filterSourceEl.appendChild(option);
             });
-            filterSource.value = currentSourceFilter;
+            filterSourceEl.value = currentSourceFilter;
         }
         
-        const filterCategory = document.getElementById('filter-category');
-        if (filterCategory) {
-            const currentCategoryFilter = filterCategory.value;
-            filterCategory.innerHTML = '<option value="all">All Categories</option>';
+        const filterCategoryEl = document.getElementById('filter-category');
+        if (filterCategoryEl) {
+            const currentCategoryFilter = filterCategoryEl.value;
+            filterCategoryEl.innerHTML = '<option value="all">All Categories</option>';
             state.categories.filter(c => c.active).forEach(c => {
                 const option = document.createElement('option');
                 option.value = c.id;
                 option.textContent = c.name;
-                filterCategory.appendChild(option);
+                filterCategoryEl.appendChild(option);
             });
-            filterCategory.value = currentCategoryFilter;
+            filterCategoryEl.value = currentCategoryFilter;
         }
 
         // Apply bulk delete filters
