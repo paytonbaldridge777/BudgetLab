@@ -323,12 +323,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const difference = budgetedAmount - actualSpent;
             
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${category.name}</td>
-                <td>$${actualSpent.toFixed(2)}</td>
-                <td>$${budgetedAmount.toFixed(2)}</td>
-                <td>$${difference.toFixed(2)}</td>
-            `;
+            
+            const nameCell = document.createElement('td');
+            nameCell.textContent = category.name;
+            
+            const spentCell = document.createElement('td');
+            spentCell.textContent = `$${actualSpent.toFixed(2)}`;
+            
+            const budgetCell = document.createElement('td');
+            budgetCell.textContent = `$${budgetedAmount.toFixed(2)}`;
+            
+            const diffCell = document.createElement('td');
+            diffCell.textContent = `$${difference.toFixed(2)}`;
+            
+            row.appendChild(nameCell);
+            row.appendChild(spentCell);
+            row.appendChild(budgetCell);
+            row.appendChild(diffCell);
             breakdownBody.appendChild(row);
         });
     }
@@ -351,21 +362,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const difference = budgetedAmount - actualSpent;
 
             const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${category.name}</td>
-                <td>
-                    <input 
-                        type="number" 
-                        class="form-input" 
-                        value="${budgetedAmount.toFixed(2)}" 
-                        data-category-id="${category.id}"
-                        min="0"
-                        step="0.01"
-                    >
-                </td>
-                <td>$${actualSpent.toFixed(2)}</td>
-                <td>$${difference.toFixed(2)}</td>
-            `;
+            
+            const nameCell = document.createElement('td');
+            nameCell.textContent = category.name;
+            
+            const budgetCell = document.createElement('td');
+            const budgetInput = document.createElement('input');
+            budgetInput.type = 'number';
+            budgetInput.className = 'form-input';
+            budgetInput.value = budgetedAmount.toFixed(2);
+            budgetInput.dataset.categoryId = category.id;
+            budgetInput.min = '0';
+            budgetInput.step = '0.01';
+            budgetCell.appendChild(budgetInput);
+            
+            const actualCell = document.createElement('td');
+            actualCell.textContent = `$${actualSpent.toFixed(2)}`;
+            
+            const diffCell = document.createElement('td');
+            diffCell.textContent = `$${difference.toFixed(2)}`;
+            
+            row.appendChild(nameCell);
+            row.appendChild(budgetCell);
+            row.appendChild(actualCell);
+            row.appendChild(diffCell);
             budgetBody.appendChild(row);
         });
     }
@@ -1001,17 +1021,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Populate preview with validation indicators
                 const previewHead = document.getElementById('csv-preview-head');
                 const previewBody = document.getElementById('csv-preview-body');
-                previewHead.innerHTML = `<tr><th>Status</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                previewHead.innerHTML = '';
+                previewBody.innerHTML = '';
                 
-                const previewRows = dataRows.slice(0, 10).map((row, idx) => {
+                // Create header row
+                const headerRow = document.createElement('tr');
+                const statusHeader = document.createElement('th');
+                statusHeader.textContent = 'Status';
+                headerRow.appendChild(statusHeader);
+                headers.forEach(h => {
+                    const th = document.createElement('th');
+                    th.textContent = h;
+                    headerRow.appendChild(th);
+                });
+                previewHead.appendChild(headerRow);
+                
+                // Create data rows
+                dataRows.slice(0, 10).forEach((row, idx) => {
                     const validation = rowValidations[idx];
-                    const statusIcon = validation.isValid 
-                        ? '<span title="Valid row">✓</span>' 
-                        : `<span title="${validation.errors.join('; ')}" style="color: red; cursor: help;">⚠️</span>`;
-                    return `<tr><td>${statusIcon}</td>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`;
-                }).join('');
-                
-                previewBody.innerHTML = previewRows;
+                    const tr = document.createElement('tr');
+                    
+                    const statusCell = document.createElement('td');
+                    const statusSpan = document.createElement('span');
+                    if (validation.isValid) {
+                        statusSpan.textContent = '✓';
+                        statusSpan.title = 'Valid row';
+                    } else {
+                        statusSpan.textContent = '⚠️';
+                        statusSpan.title = validation.errors.join('; ');
+                        statusSpan.style.color = 'red';
+                        statusSpan.style.cursor = 'help';
+                    }
+                    statusCell.appendChild(statusSpan);
+                    tr.appendChild(statusCell);
+                    
+                    row.forEach(cell => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    
+                    previewBody.appendChild(tr);
+                });
                 
                 // Populate mapping dropdowns
                 const colSelectors = [
@@ -1022,23 +1073,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 colSelectors.forEach(({id, autoIndex}) => {
                     const select = document.querySelector(id);
-                    select.innerHTML = headers.map((h, i) => 
-                        `<option value="${i}" ${i === autoIndex ? 'selected' : ''}>${h}</option>`
-                    ).join('');
+                    select.innerHTML = '';
+                    headers.forEach((h, i) => {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = h;
+                        if (i === autoIndex) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
                 });
 
                 // Populate category dropdown
                 const catSelect = document.getElementById('csv-default-category');
-                catSelect.innerHTML = state.categories.filter(c => c.active).map(c => 
-                    `<option value="${c.id}">${c.name}</option>`
-                ).join('');
+                catSelect.innerHTML = '';
+                state.categories.filter(c => c.active).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = c.name;
+                    catSelect.appendChild(option);
+                });
                 
                 // Populate source dropdown
                 const sourceSelect = document.getElementById('csv-source');
                 if (sourceSelect) {
-                    sourceSelect.innerHTML = state.sources.filter(s => s.active).map(s => 
-                        `<option value="${s.id}">${s.name}</option>`
-                    ).join('');
+                    sourceSelect.innerHTML = '';
+                    state.sources.filter(s => s.active).forEach(s => {
+                        const option = document.createElement('option');
+                        option.value = s.id;
+                        option.textContent = s.name;
+                        sourceSelect.appendChild(option);
+                    });
                 }
 
                 previewArea.classList.remove('hidden');
