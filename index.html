@@ -170,13 +170,13 @@
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="select-all-transactions"></th>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Category</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Source</th>
-                            <th>Import Type</th>
+                            <th class="sortable" data-column="date">Date <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="description">Description <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="category">Category <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="type">Type <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="amount">Amount <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="source">Source <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="importType">Import Type <span class="sort-indicator"></span></th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -324,7 +324,16 @@
                 </div>
                  <h4>Import Options</h4>
                 <div class="form-group">
+                    <label for="csv-amount-sign-logic">Amount Sign Logic</label>
+                    <p style="font-size: 0.85em; color: #666; margin: 5px 0;">How are expenses represented in your CSV?</p>
+                    <select id="csv-amount-sign-logic" class="form-input">
+                        <option value="negative">Expenses are negative numbers (default)</option>
+                        <option value="positive">Expenses are positive numbers</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="csv-default-type">Default Type for Imported Rows</label>
+                    <p style="font-size: 0.85em; color: #666; margin: 5px 0;">Used when amount is zero or sign logic doesn't determine type</p>
                     <select id="csv-default-type" class="form-input">
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>

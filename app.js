@@ -7,6 +7,10 @@ document.addEventListener('DOMContentLoaded', () => {
         transactions: [],
         monthlyBudgets: [],
         selectedMonth: new Date().toISOString().slice(0, 7), // YYYY-MM
+        transactionSort: {
+            column: 'date',
+            direction: 'desc'
+        },
         ui: {
             transactionModal: document.getElementById('transaction-modal'),
             csvImportModal: document.getElementById('csv-import-modal'),
@@ -453,8 +457,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         transactionsForMonth = transactionsForMonth
-            .filter(t => t.description.toLowerCase().includes(filterText))
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+            .filter(t => t.description.toLowerCase().includes(filterText));
+        
+        // Apply sorting based on state
+        transactionsForMonth.sort((a, b) => {
+            let aVal, bVal;
+            
+            switch (state.transactionSort.column) {
+                case 'date':
+                    aVal = new Date(a.date);
+                    bVal = new Date(b.date);
+                    break;
+                case 'description':
+                    aVal = a.description.toLowerCase();
+                    bVal = b.description.toLowerCase();
+                    break;
+                case 'category':
+                    aVal = getCategoryName(a.categoryId).toLowerCase();
+                    bVal = getCategoryName(b.categoryId).toLowerCase();
+                    break;
+                case 'type':
+                    aVal = a.type;
+                    bVal = b.type;
+                    break;
+                case 'amount':
+                    aVal = a.amount;
+                    bVal = b.amount;
+                    break;
+                case 'source':
+                    aVal = getSourceName(a.sourceId).toLowerCase();
+                    bVal = getSourceName(b.sourceId).toLowerCase();
+                    break;
+                case 'importType':
+                    aVal = a.importType || 'manual';
+                    bVal = b.importType || 'manual';
+                    break;
+                default:
+                    aVal = new Date(a.date);
+                    bVal = new Date(b.date);
+            }
+            
+            let comparison = 0;
+            if (aVal > bVal) comparison = 1;
+            else if (aVal < bVal) comparison = -1;
+            
+            return state.transactionSort.direction === 'asc' ? comparison : -comparison;
+        });
 
         transactionsForMonth.forEach(tx => {
             const isTransfer = isTransferCategory(tx.categoryId);
@@ -527,6 +575,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update select all checkbox state
         updateSelectAllCheckbox();
         updateDeleteSelectedButton();
+        updateSortIndicators();
+    }
+    
+    function updateSortIndicators() {
+        // Remove all sort classes
+        document.querySelectorAll('.sortable').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+        });
+        
+        // Add appropriate class to current sort column
+        const currentSortHeader = document.querySelector(`.sortable[data-column="${state.transactionSort.column}"]`);
+        if (currentSortHeader) {
+            currentSortHeader.classList.add(`sort-${state.transactionSort.direction}`);
+        }
     }
 
     function renderCategories() {
@@ -858,6 +920,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderTransactions();
             });
         }
+        
+        // Column sorting
+        document.querySelectorAll('.sortable').forEach(header => {
+            header.addEventListener('click', () => {
+                const column = header.dataset.column;
+                
+                if (state.transactionSort.column === column) {
+                    // Toggle direction if clicking the same column
+                    state.transactionSort.direction = state.transactionSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // New column - default to ascending
+                    state.transactionSort.column = column;
+                    state.transactionSort.direction = 'asc';
+                }
+                
+                renderTransactions();
+            });
+        });
     }
     
     // Categories Management
@@ -1094,6 +1174,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     catSelect.appendChild(option);
                 });
                 
+                // Set default category to Housing
+                const housingCategory = state.categories.find(c => c.name.toLowerCase() === 'housing' && c.active);
+                if (housingCategory) {
+                    catSelect.value = housingCategory.id;
+                }
+                
                 // Populate source dropdown
                 const sourceSelect = document.getElementById('csv-source');
                 if (sourceSelect) {
@@ -1196,6 +1282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const amountCol = parseInt(document.getElementById('csv-amount-col').value, 10);
             
             // Get modal selections for defaults
+            const signLogic = document.getElementById('csv-amount-sign-logic').value;
             const defaultType = document.getElementById('csv-default-type').value;
             const defaultCategory = document.getElementById('csv-default-category').value;
             const sourceSelect = document.getElementById('csv-source');
@@ -1231,12 +1318,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                // Determine transaction type
-                // If amount has a sign, use it; otherwise use modal default
+                // Determine transaction type based on sign logic
                 let transactionType = defaultType;
                 if (parsedAmount !== 0) {
-                    // Negative = expense, Positive = income
-                    transactionType = parsedAmount < 0 ? 'expense' : 'income';
+                    if (signLogic === 'negative') {
+                        // Negative = expense, Positive = income (default)
+                        transactionType = parsedAmount < 0 ? 'expense' : 'income';
+                    } else {
+                        // Positive = expense, Negative = income (inverted)
+                        transactionType = parsedAmount > 0 ? 'expense' : 'income';
+                    }
                 }
                 
                 // Use modal default category
