@@ -44,6 +44,13 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'source-1', name: 'Wells Fargo', active: true },
         { id: 'source-2', name: 'Amazon Visa', active: true }
     ];
+    
+    // CSV Import Constants
+    const CSV_IMPORT_DEFAULTS = {
+        CATEGORY_NAME: 'housing',
+        SIGN_LOGIC_NEGATIVE: 'negative',
+        SIGN_LOGIC_POSITIVE: 'positive'
+    };
 
     function loadData() {
         state.categories = JSON.parse(localStorage.getItem(DB_KEYS.categories)) || [];
@@ -1175,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 
                 // Set default category to Housing
-                const housingCategory = state.categories.find(c => c.name.toLowerCase() === 'housing' && c.active);
+                const housingCategory = state.categories.find(c => c.name.toLowerCase() === CSV_IMPORT_DEFAULTS.CATEGORY_NAME && c.active);
                 if (housingCategory) {
                     catSelect.value = housingCategory.id;
                 }
@@ -1321,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Determine transaction type based on sign logic
                 let transactionType = defaultType;
                 if (parsedAmount !== 0) {
-                    if (signLogic === 'negative') {
+                    if (signLogic === CSV_IMPORT_DEFAULTS.SIGN_LOGIC_NEGATIVE) {
                         // Negative = expense, Positive = income (default)
                         transactionType = parsedAmount < 0 ? 'expense' : 'income';
                     } else {
