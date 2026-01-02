@@ -1181,10 +1181,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     catSelect.appendChild(option);
                 });
                 
-                // Set default category to Housing
+                // Set default category to Housing, or first active category as fallback
                 const housingCategory = state.categories.find(c => c.name.toLowerCase() === CSV_IMPORT_DEFAULTS.CATEGORY_NAME && c.active);
                 if (housingCategory) {
                     catSelect.value = housingCategory.id;
+                } else if (state.categories.length > 0) {
+                    // Fallback to first active category if Housing doesn't exist
+                    const firstActiveCategory = state.categories.find(c => c.active && !c.isTransfer);
+                    if (firstActiveCategory) {
+                        catSelect.value = firstActiveCategory.id;
+                    }
                 }
                 
                 // Populate source dropdown
